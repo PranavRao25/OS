@@ -518,6 +518,8 @@ LeaveCriticalSection(this_pid) {
 	interested[this_pid] = FALSE;
 }
 
+Assumption of Message-primitives : Mutual Exclusion in OS
+
 CHAPTER 7 INTERPROCESS COMMUNICATION PATTERNS
 
 3 Approaches in communicating:
@@ -561,15 +563,18 @@ We will use a message queue for both processes to communicate
 This implementation depends on the dependability of processes (that they will first wait to receive a message and then try to access the resource)
 To prevent the non-dependable processes, we use monitors.
 
+Assumption of patterns - the message-passing primitives present in OS.
+
 Signalling -
 When one process acts as an informer to the user by giving signals depending on the events
 It is not symmetric, as the sender doesn't wait for the receiver
 It involves only one interaction
 
-Interprocess Signaling pattern - one process/daemon told to signal an informer process
+Interprocess Signalling pattern - one process/daemon told to signal an informer process
 In this case, both will share the same message queue, and the daemon will send a message once a task is done
 Then the informer will pick it up and process it.
 
+We don't use busy waiting in case of OS as too much time is wasted 
 Rendezvous -
 Two process simultaneous communication
 Two one-way signals
@@ -714,3 +719,42 @@ Problem -
 A Continous stream of readers can complete prevent a writer from ever gaining access
 Solution : When a reader arrives when there is already a writer waiting, it is made to wait and when the last reader leaves, the writer is given access
 
+CHAPTER 8 : SYNCHRONISATION & SEMAPHORES
+
+Synchronisation is when one process waits for a notification of an event that will occur in another process
+
+In Signalling Pattern, we use synchronisation -
+When one process reaches a signal point, it waits for the other to reach the signal point (implemented by the message queue)
+In Rendezvous Pattern, both processes synchronise together
+In Producer-Consumer Pattern, they are kept synchronised so that producer is not too ahead of consumer
+In Client-Server Pattern, A single consumer (server) synchronises with the requests of the producers (clients)
+
+Signalling is the most basic type of Program Cooperation
+Mutual Exclusion is the most basic type of Program Competition
+
+There will be 2 levels of mutual exclusions:
+1. OS level - implementation of message-passing through mutual exclusion
+2. User level - implementation of mutual exclusion through message-passing
+
+Semaphores
+
+In OS, Semaphores are used for synchronisation
+They are also named but not present in file system and its identifiers are global
+A semaphore has two Operations : Wait & Signal
+All processes that attach to the same global identifier semaphore will operate on the same semaphore
+Each process has its own local identifier for a semaphore
+
+AttachSemaphore(int sem_id) -
+1. Semaphore with sem_id looked up, and a local identifier is returned
+2. If not found, semaphore is created
+3. Semaphores are created in busy state
+
+Wait(sem_id) -
+Semaphore not busy? (busy state and return) else (block syscall and put callee into semaphore waiting queue)
+
+Signal(sem_id) -
+1. If Semaphore wait queue is empty, then its state is made Not Busy
+2. Else, extract process from the wait queue and unblock it
+
+DetachSemaphore(sem_id) -
+Callee no longer using this semaphore
