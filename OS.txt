@@ -115,7 +115,7 @@ Message Queues:
 3. No connection between two or more processes
 4. Message Queues retrieves data individually
 
-Message Queues use special identfiers rather than file descriptors, so don't rely on file I/O
+Message Queues use special identifiers rather than file descriptors, so don't rely on file I/O
 Message queues do not garuantee FIFO, processes can specify the order
 If a process requests data less than the Message Queue data size unit, it will receive nothing
 For two processes to communicate with a Message queue, they need to have a common ancestor
@@ -533,14 +533,14 @@ Serially Usable Resource - can be used by only one process at a time and can be 
 
 Attaching and Detaching Message Queues:
 To name a Message Queue as per file naming system, we can attach a Message Queue instead of creating and then detach it
-First attaching will create it as an OS data structure, and subsequent attaches will return an internal identfier to it
+First attaching will create it as an OS data structure, and subsequent attaches will return an internal identifier to it
 
 AttachMessageQueue(char *msq_name) -
 1. If there is no message queue named msq_name, it is created as "Message Queue File"
 2. Attach count for it is incremented
-3. An identfier to the message queue is returned which is used to send/receive messages (msq_id)
+3. An identifier to the message queue is returned which is used to send/receive messages (msq_id)
 
-Message Queue Identifiers are OS-wide identfiers and have the same meaning across all processes.
+Message Queue Identifiers are OS-wide identifiers and have the same meaning across all processes.
 
 DetachMessageQueue(int msq_id) -
 1. Attach count is decremented
@@ -588,9 +588,9 @@ For Many Process Rendezvous:
 We will have 1 central process called Coordinator (Server)
 All other client processes will communicate with the Coordinator, which will communicate with them individually
 There will a common message queue called coordinator_queue through which client queues can send their message
-Each process will have their own message queue (defined by queue identfier) through which the coordinator sends back the message
+Each process will have their own message queue (defined by queue identifier) through which the coordinator sends back the message
 
-Initially, each client process will send their queue identfier to the coordinator via coordinator_queue, who will note it down in an array.
+Initially, each client process will send their queue identifier to the coordinator via coordinator_queue, who will note it down in an array.
 Then the coordinator will send a message through the individual queue.
 
 Producer - Consumer :
@@ -630,4 +630,87 @@ Multiple Producers and Consumers
 Same procedure
 
 Client Server Model -
+Server Process owns resources which are used by the client processes
+Server manages requests and accesses to the resources
+Client processes need to know the common queue to send the service requests
+The server doesn't needs to know the individual queues to each client and just waits for requests
+A service request that requires response will include name a queue
+
+File Server:
+Provides range of file services
+It further uses the services of Disk Block server to get the actual file processing done
+It also maintains a Pending Requests Table for pending requests while the Disk Block server responds
+
+Variant of Producer-Consumer model
+
+Differences between Server-Client Model and Producer-Consumer Model:
+1. Client doesnt send data to server to be processed, it sends to retrieve
+2. More assymmetric
+3. Server doesn't know about clients
+4. Connection is temporary
+ 
+Database Access and Update Model -
+Common database with several readers & writers
+Readers can share access to the database with each other, but not with writers (Reader-Writer Problem)
+
+If we have readers reading the database, then new readers can enter immediately
+However, writers must wait.
+If one writer is writing, then all must wait.
+
+The database has its own main queue named coordinator_queue
+Each of the client process have their own individual queue named pid_queue asto get response from the server
+The pid_queue is called Private Scheduling Queues
+The Database server will schedule the access of its data.
+
+Reader Process -
+1. Send ReadRequest to Database via coordinator_queue alongwith pid1_queue identifier
+4. Wait for response from the Database via the pid1_queue
+5. Start Reading
+6. Send EndRead Request
+
+Writer Process -
+1. Send WriteRequest to Database via coordinator_queue alongwith pid_queue identifier
+4. Wait for response from the Database via the pid_queue
+5. Start Writing
+6. Send EndWrite Request
+
+Database Server -
+Loop(True):
+1. ReceiveMessage from the coordinator_queue.
+2. Decide the type of request
+
+Requests :
+1. ReadRequest -
+   i.  If there are no active or waiting writers then allow reader to read
+       a. Keep a count of no of active readers
+       b. Send message to the reader that it may proceed (via pid_queue)
+   ii. Put the reader into ReaderQueue
+
+2. EndRead -
+   i.  Decrement no of readers
+   ii. If No readers left and there are waiting writers
+   	a. Increment no of writers
+	b. Extract latest writer from the WriterQueue
+	c. Send message to Writer to proceed (via pid_queue)
+
+3. WriteRequest -
+   i.  If there are no active writers/readers then allow writer to write
+       a. Keep a count of no of active writers
+       b. Send message to the writer that it may proceed (via pid_queue)
+   ii. Put the writer into WriterQueue
+
+4. EndWrite
+   i.  Decrement no of writers
+   ii. If there are waiting readers
+   	a. let all readers to read ( by extracting from the queue and sending approval via pid_queue)
+   iii.If there are waiting writers
+   	a. Extract latest writer from the WriterQueue
+	c. Send message to Writer to proceed (via pid_queue)
+
+Why we did not use a Coordinator process in Database Model -
+1. Multiple Readers can read concurrently.
+
+Problem -
+A Continous stream of readers can complete prevent a writer from ever gaining access
+Solution : When a reader arrives when there is already a writer waiting, it is made to wait and when the last reader leaves, the writer is given access
 
