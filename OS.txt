@@ -140,6 +140,10 @@ Simple OS has 2 major subsystems:
 1. Process Management Subsystem
 2. Disk Management Subsystem
 
+Message Queues in SOS are implemented by two Queues:
+1. message_queue to store messages
+2. wait_queue to store processes waiting for messages
+
 Process Management Subsystem-
 handles process abstraction
 maintains process tables, creates message queues, system calls, dispatches processes to run on processor
