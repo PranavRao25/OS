@@ -835,4 +835,6 @@ Signal(Semaphore id) -
 
 Advantages of Semaphores over Message-Passing:
 1. No memory allocation required.
-2. Efficient
+
+Semaphores are more suitable for Shared Memory
+Message Queues more suitable for IPC between processes not sharing
