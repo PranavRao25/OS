@@ -744,17 +744,86 @@ A semaphore has two Operations : Wait & Signal
 All processes that attach to the same global identifier semaphore will operate on the same semaphore
 Each process has its own local identifier for a semaphore
 
+A Binary Semaphore has only 2 states : Locked/Non-locked
+It is used to enforce mutual exclusion (so also called Mutex)
+
+A counting Semaphore has n states, specifying no of processes using it currently
+
 AttachSemaphore(int sem_id) -
 1. Semaphore with sem_id looked up, and a local identifier is returned
 2. If not found, semaphore is created
 3. Semaphores are created in busy state
 
 Wait(sem_id) -
+1. We get the semaphore from its sem_id
+2. We set up a spin lock on the semaphore
+3. If another process calls the semaphore while it is busy, it is blocked and added to the semaphore queue
+4. Else, the process is free to use the semaphore (and it is made busy)
+
+We use a spin lock on the semaphore to ensure no other process sharing it can use it at the same time
+
 Semaphore not busy? (busy state and return) else (block syscall and put callee into semaphore waiting queue)
+If a process calls Wait on a busy semaphore (which means it tries to lock an already busy semaphore) then it is set to block state and put into a wait queue.
 
 Signal(sem_id) -
-1. If Semaphore wait queue is empty, then its state is made Not Busy
-2. Else, extract process from the wait queue and unblock it
+1. We get the semaphore from its sem_id
+2. We set up a spin lock on the semaphore
+3. If the semaphore queue is empty, then semaphore is set not busy.
+4. Else we extract a process from the queue and unblock it to use the semaphore
+
+Semaphore Queue empty -> no process were waiting to use the semaphore. So the semaphore is truly free.
+Signal will free a process from the semaphore and let it open for other waiting processes, so if there is a blocked process in the wait queue, it will unblock it.
 
 DetachSemaphore(sem_id) -
 Callee no longer using this semaphore
+
+Wait and Signal are atomic actions
+Wait lets the process use the semaphore and Signal frees the semaphore from the process
+Thus checking setting state of a semaphore is atomic.
+
+Comparison with Semaphores and Message Queues:
+1. Wait(Semaphore id)   = ReceiveMessage(Msq id)
+2. Signal(Semaphore id) = SendMessage(Msq id)
+3. No of Message Queues = No of Semaphores
+
+Two Process Mutual Exclusion using Semaphores:
+1. The processes share a semaphore (which is used via AttachSemaphore).
+2. One of them initialise the semaphore as being not busy
+3. When a process wants to enter a critical section gaurded by the semaphore, it will call Wait(sem_id) and lock the semaphore (or stand in the semaphore queue)
+4. If it got access, it will proceed with its work.
+5. It wil then send a Signal call to unlock the semaphore.
+6. Finally, the semaphore is detached.
+
+Rendezvous Mutual Exclusion using Semaphores:
+Both share a pair of semaphores.
+A --> sem_a	B --> sem_b
+1. Each will Signal their respective semaphore to say that they are ready to proceed. 
+2. Each will Wait the other's semaphore to wait until the other is ready to proceed.
+
+Producer-Consumer Mutual Exclusion using Semaphores:
+Two semaphores: Producer_semaphore & Buffer_semaphore
+
+Producer Process:
+1. Wait Producer_semaphore
+2. Signal Buffer_semaphore
+
+Consumer Process:
+1. Signal Producer_semaphore (initialise)
+2. Wait Buffer_semaphore
+3. Signal Producer_semaphore
+
+To use a Counting Semaphore:
+It will have an additional attribute as count, which will count no of processes currently using it.
+
+Wait(Semaphore id) -
+1. We get the semaphore from its sem_id
+2. We set up a spin lock on the semaphore
+3. If its count > 0 (there is still space for one more process to use the semaphore), then decrement count
+4. Else, the semaphore is free -> get new process from the wait queue and block it
+5. Unlock the semaphore
+
+Signal(Semaphore id) -
+1. We get the semaphore from its sem_id
+2. We set up a spin lock on the semaphore
+3. If the waiting queue is empty -> increment count (here count initially would be 0, we make it 1 so a process later able to lock it)
+4. Else, extract the process from wait queue and unblock it
