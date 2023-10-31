@@ -422,7 +422,7 @@ SwitchProcess(pid) - called when some Kernel process wants to wait (Switch proce
 3. Dispatcher()
 
 Difference between SwitchProcess and Dispatcher :
-1. SwitchProcess will switch between kernel process only while Dispatcher will switch between both user and kernel processes
+1. SwitchProcess will switch between kernel processes only while Dispatcher will switch between both user and kernel processes
 2. SwitchProcess will add a new Save area into the system stack while Dispatcher will remove a save area
 
 Each time a SysCall or SwitchProcess is made, a save area is added to the stack
@@ -546,7 +546,7 @@ Message Queue Identifiers are OS-wide identifiers and have the same meaning acro
 
 DetachMessageQueue(int msq_id) -
 1. Attach count is decremented
-2. If Attach Count ==0, destroy message queue
+2. If Attach Count==0, destroy message queue
 
 When a process is exited, all attached queues are detached.
 
@@ -575,6 +575,7 @@ In this case, both will share the same message queue, and the daemon will send a
 Then the informer will pick it up and process it.
 
 We don't use busy waiting in case of OS as too much time is wasted 
+
 Rendezvous -
 Two process simultaneous communication
 Two one-way signals
@@ -827,3 +828,7 @@ Signal(Semaphore id) -
 2. We set up a spin lock on the semaphore
 3. If the waiting queue is empty -> increment count (here count initially would be 0, we make it 1 so a process later able to lock it)
 4. Else, extract the process from wait queue and unblock it
+
+Advantages of Semaphores over Message-Passing:
+1. No memory allocation required.
+2. Efficient
