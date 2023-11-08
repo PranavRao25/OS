@@ -838,3 +838,186 @@ Advantages of Semaphores over Message-Passing:
 
 Semaphores are more suitable for Shared Memory
 Message Queues more suitable for IPC between processes not sharing
+
+Scheduling:
+
+1. First-In-First-Out Scheduling:
+Queuing
+Treats all processes equally
+Starvation is not possible
+No concept of urgent process priority
+All are assigned a Queue ID to identify, service in order of ID
+
+2. Shortest-Job-First Scheduling:
+Finish all the quickest jobs first
+Has the lowest average waiting time
+Utilitarian (Good for the group over individual)
+Multiple queues : 
+	a. Express queue for very quick processes
+	b. Normal queue for regular processes
+
+3. Priority Scheduling:
+Assign Priority to jobs, based on urgency, or need, or their importance wrt other processes
+Priority Queue
+
+4. Round-Robin Scheduling:
+Preemption - The ability for a process to halt its execution midway and allow other processes to be scheduled.
+Once a process is done, the control passes to the next process (via PID) in a cyclic manner
+Thus the control passes through all of the processes in a preemptive manner
+Relay Scheduling
+
+Preemptive Scheduling Methods:
+From the POV of the processor,
+1. Tt gets a certain process for a certain time period
+2. It executes its instructions
+3. The process finishes execution (for the time being) in the following cases:
+	a. I/O Wait
+	b. Disk Wait
+	c. Message Wait
+	d. Time Slice over
+4. Then the process is added to the process queue as a 'new' process to the scheduler
+
+Deciding the Time Quantum:
+Time Quantum is the time given to the process in the processor
+This time should be more than the time taken to schedule process work (cost of preemption)
+
+1. Static - fix a value enough
+2. Adaptive - Based on a fixed value and size of the process queue, decide the time slice
+
+We can measure the time slice wrt preemption cost: 1 Time Slice ≡ N preemption cost
+This provides the lower bound for time slice
+
+
+Policy vs Mechanism in Scheduling
+
+General Scheduling Mechanism:
+Present in the Kernel
+We have 3 Queues (Multiple Queue System in general) (q₁, q₂, q₃)
+Each queue has 2 parameters: 
+	a. Time Quantum - Q
+	b. No of times a process has passed through the Queue - N
+The last queue has no N.
+N and Q are parameters
+
+We choose the jobs to schedule following the procedure:
+1. If any jobs in q₁, select one
+2. Else, choose from the next one
+3. Repeat for all the queues
+Each job is given the time quantum appropriate from the queue it has come from.
+
+Job enqueuing:
+Based on its values of N's, it will get scheduled in any of the queues.
+
+Scheduling Policy:
+It chooses parameters for the mechanism
+It can also increase the no of queues
+Present in the OS as the dispatcher module
+
+1. N₁ = ∞, Q₁ = ∞ →  FIFO
+2. N₁ = ∞, Q₁ is Finite →  Round Robin
+3. Q₁ & Q₂ are finite, N₂ = ∞ →  Two Queue System
+
+We can have a Scheduler Process which wakes up frequently to examine the performance of the system.
+It can then make the required adjustments (It would have to bypass all processes, stop the running process to do this)
+Else we can set a limit on some particular values (temp, time,mem,etc) and use it to trigger a change of the parameters
+
+Deadlock
+(Analogous to Ant's Death Cycle)
+(Complete Traffic Jam from all sides)
+A cyclic waiting order of process where each process is waiting for a resource which another process in the cycle is holding, which in turn is waiting
+These processes will wait forever
+Sometimes, messages may get lost in transit, which will lead to a deadlock.
+
+Conditions for Deadlock to occur:
+1. Resources are not preemptable
+2. Resources are not shared.
+3. A process can hold one resource and request another.
+4. Circular wait is possible.
+
+Deadlock Prevention:
+Place restrictions on resource requests so that deadlock cannot occur
+1. Allowing Preemption - 
+	All resources can be preempted, but not possible practically.
+2. Avoiding Mutual Exclusion - 
+	Virtualize a resource using a resource scheduling process
+	Create unlimtied virtual copies of the resource
+	Useful only when we want to share a hardware resource instead of real-time access
+3. Avoiding Hold & Wait -
+	If a process can get hold of all the resources it needs at one time, no deadlock
+	Inefficient
+	Sometimes we don't know beforehand the resources that we would need
+4. Avoiding Circular Wait -
+	We can give each resource a unique, positive integer, and only acquire in an ascending order
+	Inefficient, but often used
+
+Deadlock Avoidance:
+There are Algorithms for detecting Deadlock
+Disadvantages:
+	1. The algorithms are not fast
+	2. Lot of overheads in running them before resource allocation
+	3. Assumes every process know their max resources needs
+	4. Assumes processes know what available resources are present
+
+Deadlock Recovery:
+1. Deadlock Detection - same as finding cycle in a graph, done periodically
+2. Deadlock Resolution - Preempt an resource, and clear the block
+
+Some Approaches to prevent Deadlock:
+1. Advance Claim & Deadlock Avoidance algorithm
+2. Always Allocate the requested resources
+
+Starvation:
+Process is prevented from proceeding because some other process is using the resource it needs
+One solution is Aging - as a process waits, it ages and its priority increases (so oldest first scheduling)
+
+Remote Procedure Calls (RPC)
+We can various ways of process communication via messages:
+	1. direct messaging to the processes with blocking send
+	2. per-process message queues
+	3. Blocking send-reply
+
+In the third method, the sender will wait for the receiver to become ready to receive the message (blocked)
+Then it will send the message and will wait for the receiver to send back a reply, after which both will proceed
+This is common in client-server model
+This is same as a procedure call (or a module call, where you send the arguments to a module call and wait for a return value)
+This is the basis of remote procedure calls.
+Defines the arguments and return value explicitly.
+
+Here the messages are sent over a network, so it many not be in the same Address Space (address translation required and no references required, only complete values)
+Also each of the stub function must know the network address of the other process.
+Another problem is error handling.
+
+Sender-Receiver have a subprocess/subfunctionality (known as a stub) which takes the procedure call request into a message over the network.
+Example - Your request for a YouTube video is queried by the laptop NIC over the Internet to a server, which processes the request, and then sends a reply back via its own set of NICs.
+
+RPC Algorithm:
+1. Client makes a remote procedure call to another process's functionality.
+2. Client-side stub will make it into a message on the network and send it.
+3. Server-side stub will receive the message.
+4. Server-side stub calls the real procedure on the server.
+5. Real procedure performs the requested work and calls the server-side stub.
+6. Server-stub sends the reply as a message.
+7. Client-stub receives the message.
+8. Client-stub returns to the remote procedure caller.
+
+Monitors
+Modules containing the following:
+	1. Variables - any kind of data
+	2. Condition Variables - Used for signalling inside the monitor
+	3. Procedures - Can be called from outside the monitor
+
+The variables' scope is within the monitor
+
+The monitor ensures that only one procedure is called at one time (so a process sets a lock on the monitor)
+Monitor provides Mutual Exclusion
+
+Condition variables can only be defined within a monitor
+They have two operations: wait & signal
+They have no memory
+If a process calls wait on a condition variable, it is made blocked until another process calls signals on it
+wait also unlocks the monitor
+If a process calls signal, it unblocks all waiting processes
+
+MEMORY MANAGEMENT
+
+
