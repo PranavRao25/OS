@@ -514,7 +514,6 @@ EnterCriticalSection(this_pid) {
 	other_pid = 1 - this_pid;
 	interested[this_pid] = TRUE;
 	turn = this_pid;
-
 	while(interested[other_pid] && turn == this_pid)	pass;
 }
 
@@ -550,7 +549,7 @@ Message Queue Identifiers are OS-wide identifiers and have the same meaning acro
 
 DetachMessageQueue(int msq_id) -
 1. Attach count is decremented
-2. If Attach Count==0, destroy message queue
+2. If Attach Count == 0, destroy message queue
 
 When a process is exited, all attached queues are detached.
 
@@ -1025,5 +1024,3 @@ There are 2 levels of memory management:
 2. Process memory management - allocated a memory block from the OS, handles the internal management of it
 
 In C++, process memory manager is 'new', and in C it is 'malloc'
-
-
