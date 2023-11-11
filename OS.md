@@ -1,4 +1,7 @@
-Control registers:
+Textbooks:
+1.  [Operating systems : a design-oriented approach](file:///home/pranav/Documents/Textbooks/OS/Operating%20systems%20a%20design-oriented%20approach%20.pdf)]
+
+Control registers: 
 1. ia - Instruction address register contains the address of the next instruction
 2. psw - Program status word -
     a. 00 - System Mode / Masked interrupts
@@ -69,7 +72,7 @@ Process Management System Calls -
 2. Exit - terminate the process making the system call
 3. Wait - wait for another process to Exit
 4. Fork - create a child process
-5. Execv - run a new process
+5. Execv - run a new process 
 
 Interprocess Communication System Calls -
 1. CreateMessageQueue - create a queue to hold messages
@@ -206,11 +209,11 @@ When the hardware does the required action, it will call the Disk Interrupt Hand
 
 DiskRead - 
 DiskWrite -
-DiskIO(int command, int block, char *buffer) - Creates a new DiskRequest(command, block, buffer, pid), inserts it into the Disk Queue, sets process state waiting and calls the ScheduleDisk (for disk action)
+DiskIO(int command, int block, char \* buffer) - Creates a new DiskRequest(command, block, buffer, pid), inserts it into the Disk Queue, sets process state waiting and calls the ScheduleDisk (for disk action)
 ScheduleDisk(void) - if disk busy, return else execute the command
 DiskHandler(void) - Save current context, set waiting process as ready, call ScheduleDisk and Dispatcher
 DiskBusy(void) - Check disk status register and return if it is busy (Hardware Interface)
-IssueDiskRead(int block, char *buffer, int enable_disk_interrupt) - (Hardware Interface)
+IssueDiskRead(int block, char \*buffer, int enable_disk_interrupt) - (Hardware Interface)
 
 OS System Calls / OS processes have very small state size (no memory, only few specifying details)
 
@@ -540,7 +543,7 @@ Attaching and Detaching Message Queues:
 To name a Message Queue as per file naming system, we can attach a Message Queue instead of creating and then detach it
 First attaching will create it as an OS data structure, and subsequent attaches will return an internal identifier to it
 
-AttachMessageQueue(char *msq_name) -
+AttachMessageQueue(char \*msq_name) -
 1. If there is no message queue named msq_name, it is created as "Message Queue File"
 2. Attach count for it is incremented
 3. An identifier to the message queue is returned which is used to send/receive messages (msq_id)
@@ -1023,4 +1026,187 @@ There are 2 levels of memory management:
 1. OS memory management - allocates large blocks of memory to processes
 2. Process memory management - allocated a memory block from the OS, handles the internal management of it
 
-In C++, process memory manager is 'new', and in C it is 'malloc'
+In C++, process memory manager is 'new', and in C it is 'malloc'.
+
+Before a process is loaded into the memory for execution
+1. The source code is converted into a load module (which is stored on the disk)
+2. When the process is started, the load module is loaded from the disk to the memory
+
+Object Modules
+Object module is formed when source code is compiled by the compiler.
+It is done for the machine to better understand the code.
+Its format is:
+1. Header information
+	1.  Contains sizes of all sections
+	2. Contains information about the module
+2. Machine Code (Text)
+	1. Executable instructions (compiled by the compiler)
+3. Initialized data
+	1. Contains all global and static data used by the program which require initialisation
+4. Symbol Table
+	1. Contains External symbols
+		1. Undefined Extenal Symbol -
+			1. imported from another module
+			2. name and usage locations recorded
+			3. During linking, these locations are filled.
+		2. Defined Extenal Symbol -
+			1. Defined in this module
+			2. Used as undefined symbols elsewhere
+			3. Record name and value
+5. Relocation Information
+	1. Used by the linker to combine several object modules into a load module 
+
+The object module doesn't contain the details about uninitialised data section (which would also contain only global & static data) as its initial size is undefined (may change which will be allocated). Only its size is recorded.
+
+Library -
+1. Archive of object modules collected in a single file of special format
+2. Managed by Library Manager
+
+Linker -
+1. Relocate the object module
+2. Link the Object modules
+3. Search the libraries for external references not found in the object modules
+4. Combine object modules into a single load module
+
+It searches the libraries as it knows its format and fetches its object modules.
+It finally creates a self sufficient program with no dependencies.
+
+![[Pasted image 20231110205917.png]]
+
+The load module is divided into 3 sections:
+1. Code
+2. Initialized data
+3. Uninitialised data
+
+Linker Process -
+1. Create an empty load module and global symbol table
+2. Read an object module from the command line
+3. If it is an object module:
+	1. Find an empty space within the load module, and get its address.
+	2. Move the code & data of the object module into the space.
+	3. Merge the object symbol table into the global symbol table:
+		1. For each undefined external symbol:
+			1. If it is already present in the global symbol table, then write its value into the object module space.
+			2. Else, keep a note (?) of the symbol, and fix the links during a later module loading.
+		2. For each symbol definition:
+			1. Fix all of the undefined missing symbol references in the global symbol table.
+4. If the object module is from an library then:
+	1. Find each undefined symbol in the global symbol table.
+		2. Check if the symbols are defined in the library; If so, load the module.
+5. Repeat from Step 3.
+
+Each object module is connected loosely via symbol references (e.g sqrt function will link the Math module).
+So the object modules are linked together by defining the common symbols between them.
+
+Static Relocation:
+Each object module has its own local address space. When we are linking all of them together into a load module, we have to change all of the local address references to absolute address references wrt load module.
+The local address references are saved in a table by the compiler/assembler which is used by the linker in resolving the address issue.
+
+Dynamic Relocation :
+The load module itself is located somewhere in the disk, so when it is read into the memory, its address is adjusted to be absolute by adding the <i>base</i> register. Since all of the object module addresses are now wrt load module, the base address is added to all of them same.
+
+Each Process memory block has 5 sections:
+1. Executable Code (from the load module)
+2. Initialized Data (from the load module)
+3. Uninitialised Data (size stored in the header of the load module)
+4. Heap
+5. Stack (for procedure calls)
+Heap and Stack are dynamically allocated more data.
+
+Object modules - Only Compiled
+Load modules - Compiled & Linked
+
+Load Time Dynamic Linking (Save space )
+
+Designate some libraries as Load Time Dynamic Link Library.
+If a program contains a reference to an object module within these libraries, the linker will just insert information about where to find the module in the memory and where to be loaded.
+So the run time loader will complete the library loading process.
+This saves disk space but takes time.
+Works when the libraries in the file system remain in the same place.
+
+Run Time Dynamic Linking (Save time)
+
+Load the library module once when actually needed (on the go). But once called, it will persist in the program.
+We will include a pointer to the procedure call of the module.
+It is initially set to interrupt the loader, when the loader will load the module.
+Then the pointer will point to the module.
+
+Differences between Static and Dynamic Linking:
+1. Static takes more space than Dynamic.
+2. Static is faster than Dynamic.
+3. Dynamic has better responsiveness.
+4. Dynamic will load the most recent version of the library.
+
+Memory Allocation Problem:
+Given a fixed large size memory.
+Each process will request some chunk of memory.
+The memory allocated will be at least larger than the memory requested.
+There is a queue of memory requests.
+
+Memory Organization -
+How the memory is divided into subblocks for allocation.
+Static Division - the memory is already divided into chunks.
+Dynamic Division - Divide with allocation 
+
+Memory management -
+Allocation policy; Decisions about which to allocate a request
+
+Static Memory Allocation-
+We expect memory requests of large range.
+So we partition the memory into various chunks of different sizes
+It is easy to implement
+Works when
+1. the range is small
+2. there are only a few requests with different sizes
+Bad when
+1. Range too big
+2. Some requests are too large
+
+Buddy System -
+We start with dividing the memory into various same sizes chunks.
+When a request of a smaller size comes, then the larger chunk is divided into half.
+When a memory is freed, then the two chunks are rejoined together.
+
+Dynamic Memory Allocation- 
+
+Fragmentation - When the memory is divided into so many small blocks that all of them become useless to be allocated.
+Can be avoided by regrouping the adjacent free blocks.
+
+Block List -
+Used to keep track of all the blocks in the memory in form of a linked list.
+We linearly traverse the list for an empty block - which is either allocated as a whole or subdivided.
+When a block is freed, we join the free blocks together.
+
+There are 2 implementations for linked list:
+1. Block addresses:
+	The Linked List Node contains two information - Block Address & Status.
+	The space for the Block List is from the memory itself, done using fixed-size allocation, seperate from the blocks.
+2. Block Headers:
+	Each block will have a header space which is used as the node for the linked list.
+	The Header consists of - Size of the block, status of the block & list pointer
+
+Bitmap Method:
+We maintain a bit for each block in an array.
+If that block is allocated, corresponding bit is 1 else 0.
+Fixed size contigous allocation
+
+Differences between List Method and Bitmap Method:
+1. List is better for less blocks.
+2. Overhead for the block is same for both.
+3. List need not use fixed size contigous allocation, whereas Bitmap will need to.
+4. List - Fast to find free blocks; 
+5. Bitmap can be distributed over the disk and memory.
+
+Memory Management System Calls 
+
+In UNIX, the highest memory address a process gets is called a <i>Break</i>.
+There is only one system call (int brk(char\* addr)) which requests that the value of the break be changed. 
+
+The per-process memory manager manages only the Heap.
+The programming language runtime procedures manage the Stack.
+
+If there are free blocks in between the Heap, then the memory manager will not free them for the OS.
+
+A Different System Calls- char\* AllocateMemory(int length)
+
+Allocates 'length' amount of bytes and returns their starting address.
