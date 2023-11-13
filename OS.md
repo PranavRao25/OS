@@ -1210,3 +1210,168 @@ If there are free blocks in between the Heap, then the memory manager will not f
 A Different System Calls- char\* AllocateMemory(int length)
 
 Allocates 'length' amount of bytes and returns their starting address.
+
+CHAPTER 11
+
+Dealing with Fragmentation 
+
+We need Logical Address Space to be contigous, not the Physical Address Space. The OS memory manager allocates physical memory, not logical memory.
+So we divide our program into multiple parts and give each part its own seperate area in the memory.
+
+The processor knows whether it is fetching an instruction or a data, based on the 'ia' register.
+So, it can have two different relocation registers (which are like base registers & get added to the logical address) for code & data, so two different areas of memory.
+
+Segmentation:
+We make multiple segments in the program, and allocate different areas of memory for each of them.
+The processor has some segment registers which come in pairs -
+(base : length) :: (base : bound)
+Segments can be of varying sizes 
+
+1. Logical Address - Segment || Offset
+2. Choose the pair of segment registers based on Segment bits
+3. If Offset $\geq$ Length $\rightarrow$ Segmentation Fault
+4. Physical Address - Base || Offset
+
+Paging:
+A Page is a fixed-size segment; It has only a base register
+Page Table Entry (PTE) is a word of information about one page
+A Page Table is a collection of PTEs
+Paging is completely transparent to the programmer
+
+How to determine No of pages and their size from Logical Address length:
+1. # Pages = $2^{\#(\text{Page bits})}$ 
+2. Size of 1 Page = $2^{(\text{Offset Length})}$ 
+
+More pages, more overhead on process switching (as each time we would have to save register data on pages)
+
+The Page table is stored in the memory (which is a list of pages indexed by the base value)
+The processor has a Page base register value which points to the location of the page table.
+
+1. Logical Address = Page || Offset 
+2. Page Number = Page Base Register + Page
+3. Physical Address = \[Page Number\] || Offset
+
+Page Table Caching:
+Done to reduce the memory access times for each instruction 
+In a few processor registers, we keep the most recent accessed page base registers
+This Cache is known the Translation Lookaside Buffer (TLB)
+The hardware will search the cache using associative registers so is very fast.
+
+Cache Hit - Page base register found in TLB
+Cache Miss - Page Base register not found in TLB
+Cache Hit Rate - % times Cache Hit
+
+For a given Logical Address,
+1. Check if Cache Hit
+2. If Yes, Add Offset to Page Base address
+3. If No, Access the Page table from memory, and store the base register in the TLB
+
+This design is based on the fact of Locality.
+The programs tend to concentrate on a small region of the address space at a time so exhibit high degree of locality.
+
+Memory Allocation with Paging
+All programs will be alloted a integral number of fixed size pages
+Page Frame - Blocks of memory in Physical Memory that can hold a page (same size)
+A Page can go into any page frame based on the base register 
+Pages are logical entities, Page Frames are physical ones
+
+Paging leads to Internal Fragmentation - Wasted space within the process memory space
+
+Page Table
+PTE - Base Register || Protection Field
+
+The protection field tells how the pages can be validly used.
+There can be for example 3 bits of information:
+1. bit0 - read
+2. bit1 - write
+3. bit2 - execute
+
+Swapping:
+Move entire programs to/fro the main memory & secondary memory
+
+Overlays:
+When the program code is too big to be loaded into the memory
+We divide it based on overlays on the disk and on demand bring it to the memory
+Require the programmer to design the overlay structure.
+
+Virtual Memory
+Similiar to Paging (addition of pages in the disk)
+Not all pages are loaded into the memory, some are still in the disk and brought to the memory on demand
+The process is in the illusion that all of its pages are in the memory, so when it tries to access a page not in the memory, the OS will bring it to the memory from the disk.
+So in actuality, only a part of the program is in the memory, rest in the disk.
+
+1. Process asks for a page not in memory (the process itself doesn't know this fact)
+2. An interrupt (page fault) is generated , which is intercepted by the OS
+3. OS will read the page from the disk to the memory.
+4. It will change the page table.
+5. It will restart the execution of the process from the point of access.
+
+Hardware support for Page Fault Interrupts:
+Additional field in the PTE : Present bit (0 if not, 1 if yes)
+
+Software support for Page Fault Interrupts:
+Swap area - Disk area reserved by the OS to hold the image of virtual address spaces (?) 
+
+Process Creation:
+1. Create a swap area in the disk for the process using the size defined in the load module.
+2. Initialise it using the machine code and  initialized data from the load module.
+3. Allocate space for the process page table in the memory.
+4. Initialise the PTEs as not present and the protection fields as the Read/Write/Execute.
+5. Record location of Page table and swap area in the Process descriptor.
+
+Process Dispatch:
+1. Invalidate the TLBs.
+2. Load the hardware base register with the location of  the page table in the process descriptor.
+
+Page Fault:
+1. Find the page which has generated the fault.
+2. Find an empty page frame. If none are free, then swap one page into the disk swap area.
+3. Read the page from disk to memory.
+4. Update the page table.
+5. Continue with the process execution.
+
+Process Exit:
+1. Free the page table memory.
+2. Free the swap area.
+3. Free the page frames.
+
+Page Fault Rate - % Memory refernces leading to Page fault 
+Lower the faster
+
+An OS may not wait for the Page fault to be resolved. Instead it would already have some free page frames which will be immediately allocated to the page.
+A Paging Daemon (running within the OS) will wake up in fixed intervals and collect all the free page frames into one pool. It will use the paging replacement algorithm to free up any swapping pages.
+
+Spatial Locality : 
+Generated by sequential instructions as next reference is almost always close in terms of address wrt the previous instruction.
+
+Temporal Locality:
+Generated by Instruction Loops as references will happen in a short time as the other
+
+Paging benefits both Temporal and Spatial Locality.
+
+With Virtual Memory, we can fit multiple programs (at least parts of them) in the memory 
+
+Some Data Structures present in the Physical Memory:
+1. Free Page Frame List - List of all current free page frames
+2. Modified Free Page Frame List - List which contains free pages which needs to be written to the disk (soon to be free)
+3. Replacement Algorithm Table - Holds information about the pages.
+
+Page Replacement Algorithm will decide the best page to be replaced into the disk.
+Before it does so, it must save the page contents into the swap area (calling the disk manager).
+
+File Mapping:
+Mapping/Bringing parts of the file into the memory from the disk on demand 
+The parts of file is not saved in the swap area (no need of disk-to-disk copy)
+The code of the load module can be file mapped
+
+int MapFile(int openFIleID, char\* startAddress, int startOffset, int length=0)
+	An open file of openFIleID is mapped.
+	data to be mapped starts from startOffset  till startOffset +length into startAddress
+UnMapFile(char \* startAddress)
+
+Advantages of File Mapping:
+1. No explicit I/O by the user
+2. Reduce # of copies in the physical memory
+3. It provides a live copy of the open file, so all processes sharing the same open file mapping can see the reflected copy as it is reused to all
+4. Atomic 
+
