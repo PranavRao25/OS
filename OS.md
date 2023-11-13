@@ -1239,7 +1239,7 @@ A Page Table is a collection of PTEs
 Paging is completely transparent to the programmer
 
 How to determine No of pages and their size from Logical Address length:
-1. # Pages = $2^{\#(\text{Page bits})}$ 
+1. # Pages = $2^{\text{|Page|}}$ 
 2. Size of 1 Page = $2^{(\text{Offset Length})}$ 
 
 More pages, more overhead on process switching (as each time we would have to save register data on pages)
