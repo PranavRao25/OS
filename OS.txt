@@ -1,3 +1,5 @@
+OPERATING SYSTEM NOTES
+
 Control registers:
 1. ia - Instruction address register contains the address of the next instruction
 2. psw - Program status word -
