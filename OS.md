@@ -870,7 +870,7 @@ Relay Scheduling
 
 Preemptive Scheduling Methods:
 From the POV of the processor,
-1. Tt gets a certain process for a certain time period
+1. It gets a certain process for a certain time period
 2. It executes its instructions
 3. The process finishes execution (for the time being) in the following cases:
 	a. I/O Wait
@@ -888,7 +888,6 @@ This time should be more than the time taken to schedule process work (cost of p
 
 We can measure the time slice wrt preemption cost: 1 Time Slice ≡ N preemption cost
 This provides the lower bound for time slice
-
 
 Policy vs Mechanism in Scheduling
 
@@ -1457,7 +1456,8 @@ One unit of virtual time - one page reference
 
 Reference string - sequence of page references : r1, r2, ... rT
 
-We shall look back on certain t references, so the working set is W(T,t) = {rT,rT-1,rT-2,...,rT-t+1}
+We shall look back on certain t references, so the working set is
+$W(T,t) = \{r_{T},r_{T-1},r_{T-2},...,r_{T-t+1}\}$ 
 
 Resident Set -
 Set of pages currently present in the memory while a process is running
