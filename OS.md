@@ -1,6 +1,12 @@
 Textbooks:
 1.  [Operating systems : a design-oriented approach](file:///home/pranav/Documents/Textbooks/OS/Operating%20systems%20a%20design-oriented%20approach%20.pdf)]
 
+OS is a resource manager and implementation of virtual computers
+Resource management - 
+1. Transformation
+2. Multiplexing
+3. Scheduling
+
 Control registers: 
 1. ia - Instruction address register contains the address of the next instruction
 2. psw - Program status word -
@@ -158,9 +164,17 @@ includes a disk driver which accopts disk operations and schedules them on the d
 
 Save Area -
 Records hardware context of a process (contains all the registers)
+1. base -
+2. bound -
+3. ia -
+4. psw -
 
 Process Descriptor
-Data structure which records the state of a process (register and process state) (slot allocated, time left till switch, state (Running, Ready, Blocked, Save Area
+Data structure which records the state of a process:
+1. SlotAllocated : Space
+2. timeLeft : time left from previous time slice
+3. state : running/ready/blocked
+4. Save Area : register save area
 
 Interrupts-
 1. System Calls
@@ -171,6 +185,8 @@ Interrupts-
 System Stack -
 It doesn't hold any procedure flow of the OS
 It is just used as a data structure to interact between user and kernel mode
+Only one system stack
+Clears everytime we enter/exit the kernel Mode
 
 Timer Interrupt handler:
 Timer is hardware interrupt
@@ -185,7 +201,7 @@ Context Switching -
 1. Hardware : ia --> iia, psw --> ipsw
 2. Interrupt Handler : iia. ipsw --> Save Area
 3. Interrupt Handler : Rest of registers --> Save Area
-4. Interrupt Handled by OS
+4. Interrupt Handled by OS (set current process state = ready/timeleft = 0)
 5. Dispatcher called (loads the next process state)
 6. Save Area --> iia, ipsw
 7. Rti
@@ -196,11 +212,39 @@ Call Dispatcher
 Process 0 - idle
 Process 1 - init
 
+Init Process -
+first process that runs 
+
+Idle Process -
+Used to help in context switching
+
+Process Creation:
+Input - Disk blocks (first block address, no of blocks)
+1. Find an empty slot in Process Descriptor
+2. In the Process Descriptor entry:
+	1. Mark the slot allocated
+	2. State - Ready
+	3. Initialise the save area ia, base, bound, psw
+	4. Load the data from the disk blocks into the save area
+
 System Call Interrupt Handler
 1. Save Context of caller
 2. Switch case based on required system call
 3. Move to the respective system call handler after getting the arguments
 4. Dispatcher()
+
+System Stack changes in Context switching:
+1. Empty when process enters/exits user mode
+2. Enter OS stack frame added to the stack (which contains the address translation, mode switching)
+3. OS figures the system call and calls the appropriate system call handler
+4. System call handler added as a stack frame
+5. Syscall handler calls dispatcher
+6. New process selected and switched (stack cleared)
+
+Exception handler:
+Halt the process
+Clear the process descriptor entry
+Call dispatcher
 
 Disk Handling
 Disk Queue maintains a list of required Disk Reads/Writes left to run
@@ -211,7 +255,7 @@ DiskRead -
 DiskWrite -
 DiskIO(int command, int block, char \* buffer) - Creates a new DiskRequest(command, block, buffer, pid), inserts it into the Disk Queue, sets process state waiting and calls the ScheduleDisk (for disk action)
 ScheduleDisk(void) - if disk busy, return else execute the command
-DiskHandler(void) - Save current context, set waiting process as ready, call ScheduleDisk and Dispatcher
+DiskHandler(void) - When I/O is complete, Save current context, set waiting process as ready, call ScheduleDisk and Dispatcher
 DiskBusy(void) - Check disk status register and return if it is busy (Hardware Interface)
 IssueDiskRead(int block, char \*buffer, int enable_disk_interrupt) - (Hardware Interface)
 
@@ -279,12 +323,11 @@ SHARED OS -
 Only 1 OS Code
 System Initialization done by only one processor (which initialises its data then starts the second processor)
 Two processors run mutual exclusively at the same time
-Each processor has its own
+Private Data - 
 a. Set of registers
 b. System Stack (better coordination)
 c. current processes
 d. Timer
-
 Global Data -
 a. Process Table (Not good for two individual process table as one may be full ready other not)
 b. Disk Queue
@@ -304,12 +347,31 @@ Ex - memory R/W
 Critical Section - Section of program with shared memory
 
 Exchangeword - 
-To make reading old process state and writng the new value into an atomic action
+To make reading old process state and writing the new value into an atomic action
 Exchanges the values from a memory cell and hardware register (read from memory cell and write into it)
 If two processors run ExchangeWord on same memory cell, then the cell will hold either of the values (the only way to do this both processes run non overlapping manner)
 To gain access of the memory cell, a process calls the memory module over the system bus.
 So the bus H/W unit fixes a processes as the bus master for some amount of cycles (1 cycle for read/write) and lets it run its atomic actions uninterrupted
 This is used in the case of sharing Process Table (with the non-using one in a Busy Wait)
+
+```
+bool ExchangeWord(val,addr) {
+	old = *addr;
+	*addr = val;
+	return old;
+}
+
+void Acquire(bool *lock) {
+	while(ExchangeWord(true,lock)==true);
+}
+
+void Release(bool *lock) {
+	*lock = false;
+}
+```
+
+If ExchangeWord == True; then old = True then lock was already set
+Else old = False, lock was free and now the lock is set
 
 Process Table - 
 Being a shared resource, we need to protect it from illegal accesses
@@ -322,6 +384,7 @@ Problem with Busy Wait is waste of time
 Spin Lock - 
 Variable protecting a shared resource and its state spinning (ExchangeWord) between itself and the processors
 The ProcessTableFreeFlag above is a Spin Lock
+No time waste, as we are just checking the value of register which we already have access to
 
 Dispatcher -
 We fix the process table to ourselves during its run
@@ -383,9 +446,12 @@ OS Threads
 In the simple implementation, we had made the OS wait for Message Queues, or Disk Queues.
 This is done by saving the process context and blocking it
 Better than this, we allow threads to run inside the OS Address Space, which will do all of the processing and interrupt handling.
-Each Process is given its own Per-Process System stack which will store the context (save area) for each interrupt, and its kernel threads refer to the top of the stack (latest context)
+So we will make one kernel thread for disk/message service for a particular process, which will wait while other threads run
+Each Process is given its own Per-Process System/Kernel stack which will store the context (save area) for each interrupt, and its kernel threads refer to the top of the stack (latest context)
+The save area will store the registers (ia,psw,arguments,etc)
+We will have a thread for each save area, so this will help in restoring the kernel thread to running
 Each User process will also have its own set of kernel processes
-Each new save area will be linked to the previous save area.
+Each new save area will be linked to the previous save area. (by linking we have ensured a line of control, and a parent-child relationship between threads)
 This speeds up the procedure.
 Each save area will have its first word as a pointer to the previous save area
 Each process will a counter as inSystem which will count two things:
@@ -401,26 +467,28 @@ All Interrupt Handlers will do the following -
 
 SystemCall Interrupt Handler:
 1. Save Area Updation -
-	i.	We will first acquire the memory chunk from the stack for the new save area
-		(We are substracting the size of Savearea + 4 because it is a stack, so bottoms up)	
-	   	If the process is entering into kernel mode for the first time, it will allocate the last (empty) slot in the linked list (stack)
-	ii.	We store the registers, timeLeft and the pointer to the last save area in this space (as this save area forms the new top)
-	iii.	We then push the new save area into the System stack (making it as the top)
-	iv.	We shall link this new save area to the last save area
-	v.	We increment the inSystem
+	1. We will first acquire the memory chunk from the stack for the new save area
+	    (We are substracting the size of Savearea + 4 because it is a stack, so bottoms up)	
+	    If the process is entering into kernel mode for the first time, it will allocate the last (empty) slot in the linked list (stack)
+	2. We store the registers, timeLeft and the pointer to the last save area in this space (as this save area forms the new top)
+	3. We then push the new save area into the System stack (making it as the top)
+	4. We shall link this new save area to the last save area
+	5. We increment the inSystem
 2. Interrupt Running -
-	i.	Starts by loading 2 into psw register
-	ii.	Switch based on the system calls
+	1. Starts by loading 2 into psw register
+	2. Switch based on the system calls
 
 Changes to Send/Receive Message Queues:
+Wait Queues of receiver threads
+Message Queues of message buffers
 1. SendMessageCall(char msg, int q) - No longer has to send the message directly to the receiver.
-	i.   Get a Message Buffer and copy the user msg into it
-	ii.  If there is some receiver waiting in the wait queue, then wake it
-	iii. Insert the message into the message queue
-	iv.  Call Dispatcher
+	1. Get a Message Buffer and copy the user msg into it
+	2. If there is some receiver waiting in the wait queue, then wake it
+	3. Insert the message into the message queue
+	4. Call Dispatcher
 2. ReceiveMessageCall(user_msg, q) - Check if the message queue is empty, block itself else take the message
-	i.  If Message Queue is Empty, state is blocked, insert itself into the wait queue and Switch
-	ii. Else, transfer the message from the queue to the user msg buffer
+	1. If Message Queue is Empty, state is blocked, insert itself into the wait queue and Switch
+	2. Else, transfer the message from the queue to the user msg buffer
 
 Switching Kernel Processes
 SwitchProcess(pid) - called when some Kernel process wants to wait (Switch processes)
@@ -429,8 +497,11 @@ SwitchProcess(pid) - called when some Kernel process wants to wait (Switch proce
 3. Dispatcher()
 
 Difference between SwitchProcess and Dispatcher :
-1. SwitchProcess will switch between kernel processes only while Dispatcher will switch between both user and kernel processes
-2. SwitchProcess will add a new Save area into the system stack while Dispatcher will remove a save area
+
+| SwitchProcess                             | Dispatcher                             |
+|----------------------------------------- | -------------------------------------- |
+| switch only between kernel processes      | switch between user & kernel processes |
+| Add a new save area into the system stack | Remove a save area                     |
 
 Each time a SysCall or SwitchProcess is made, a save area is added to the stack
 Whenever we are modifying the save area, we cannot allow interrupts to occur.
@@ -446,12 +517,12 @@ Example : Process wants console input
 7. It calls the SwitchProcess
 8. SwitchProcess will create a new Save Area and push into the System Stack (SAVE_AREA 2)
 9. SwitchProcess will call Dispatcher
-10.After the terminal input is entered, Console Interrupt is raised
-11.This process is put into the ready state
-12.When Dispatcher picks it up for scheduling, it will reload SAVE_AREA 2 and run the process
-13.This Save Area will have the ia set in Console Read, so it will run and finish it
-14.It will exit Console Read case, exit Systemcall and call Dispatcher
-15.The Dispatcher will schedule it again (as it in state Ready), reload SAVE_AREA 1 and run it further
+10. After the terminal input is entered, Console Interrupt is raised
+11. This process is put into the ready state
+12. When Dispatcher picks it up for scheduling, it will reload SAVE_AREA 2 and run the process
+13. This Save Area will have the ia set in Console Read, so it will run and finish it
+14. It will exit Console Read case, exit Systemcall and call Dispatcher
+15. The Dispatcher will schedule it again (as it in state Ready), reload SAVE_AREA 1 and run it further
 
 Dispatcher Kernel Process
 
@@ -494,6 +565,8 @@ Requires Busy Waiting
 No Hardware Assistance
 Best for distributed systems with no central control
 
+Dekker Solution :
+
 Peterson Solution :
 If Process A & B want to do some processing on a Shared Critical Section, their control flow is:
 1. EnterCriticalSection(pid)
@@ -509,6 +582,7 @@ Assumptions about Processes A & B:
 Algorithm:
 
 Global Data -
+```
 process PIDs = 0 || 1;
 interested[2] = {FALSE, FALSE};
 turn = -1;
@@ -523,6 +597,8 @@ EnterCriticalSection(this_pid) {
 LeaveCriticalSection(this_pid) {
 	interested[this_pid] = FALSE;
 }
+```
+
 
 Assumption of Message-primitives : Mutual Exclusion in OS
 
@@ -593,8 +669,8 @@ Each process uses one queue to send and one queue to receive
 As both queues are independent, it can be done simultaneously
 The receiver doesn't look at the message contents
 
-A ======> B
-A <=====> B
+A ------------> B
+A <------------ B
 
 For Many Process Rendezvous:
 We will have 1 central process called Coordinator (Server)
@@ -693,38 +769,36 @@ Loop(True):
 
 Requests :
 1. ReadRequest -
-   i.  If there are no active or waiting writers then allow reader to read
-       a. Keep a count of no of active readers
-       b. Send message to the reader that it may proceed (via pid_queue)
-   ii. Put the reader into ReaderQueue
-
+   1. If there are no active or waiting writers then allow reader to read
+	   1. Keep a count of no of active readers
+	   2. Send message to the reader that it may proceed (via pid_queue)
+   2. Put the reader into ReaderQueue
 2. EndRead -
-   i.  Decrement no of readers
-   ii. If No readers left and there are waiting writers
-   	a. Increment no of writers
-	b. Extract latest writer from the WriterQueue
-	c. Send message to Writer to proceed (via pid_queue)
-
+	1. Decrement no of readers
+	2. If No readers left and there are waiting writers
+		1. Increment no of writers
+		2. Extract latest writer from the WriterQueue
+	3.  Send message to Writer to proceed (via pid_queue)
 3. WriteRequest -
-   i.  If there are no active writers/readers then allow writer to write
-       a. Keep a count of no of active writers
-       b. Send message to the writer that it may proceed (via pid_queue)
-   ii. Put the writer into WriterQueue
-
+	1. If there are no active writers/readers then allow writer to write
+		1. Keep a count of no of active writers
+		2. Send message to the writer that it may proceed (via pid_queue)
+	2. Put the writer into WriterQueue
 4. EndWrite
-   i.  Decrement no of writers
-   ii. If there are waiting readers
-   	a. let all readers to read ( by extracting from the queue and sending approval via pid_queue)
-   iii.If there are waiting writers
-   	a. Extract latest writer from the WriterQueue
-	c. Send message to Writer to proceed (via pid_queue)
+   1. Decrement no of writers
+   2. If there are waiting readers
+	   1. let all readers to read ( by extracting from the queue and sending approval via pid_queue)
+   3. If there are waiting writers
+	   1. Extract latest writer from the WriterQueue
+	   2. Send message to Writer to proceed (via pid_queue)
 
 Why we did not use a Coordinator process in Database Model -
 1. Multiple Readers can read concurrently.
 
 Problem -
-A Continous stream of readers can complete prevent a writer from ever gaining access
-Solution : When a reader arrives when there is already a writer waiting, it is made to wait and when the last reader leaves, the writer is given access
+A Continuous stream of readers can complete prevent a writer from ever gaining access
+Solution : 
+When a reader arrives when there is already a writer waiting, it is made to wait and when the last reader leaves, the writer is given access
 
 CHAPTER 8 : SYNCHRONISATION & SEMAPHORES
 
@@ -769,7 +843,14 @@ Wait(sem_id) -
 
 We use a spin lock on the semaphore to ensure no other process sharing it can use it at the same time
 
-Semaphore not busy? (busy state and return) else (block syscall and put callee into semaphore waiting queue)
+```
+Semaphore not busy?
+	(busy state and return)
+else
+	(block syscall and put callee into   semaphore waiting queue)
+
+```
+
 If a process calls Wait on a busy semaphore (which means it tries to lock an already busy semaphore) then it is set to block state and put into a wait queue.
 
 Signal(sem_id) -
@@ -803,12 +884,36 @@ Two Process Mutual Exclusion using Semaphores:
 
 Rendezvous Mutual Exclusion using Semaphores:
 Both share a pair of semaphores.
-A --> sem_a	B --> sem_b
+
+A --> sem_a	
+B --> sem_b
+
+```
+process_A():
+	signal(A,sem_A); # ready to proceed
+	wait(A,sem_B); # wait till B is ready
+
+process_B():
+	signal(B,sem_B); # ready to proceed
+	wait(B,sem_A); # wait till A is ready
+```
+
 1. Each will Signal their respective semaphore to say that they are ready to proceed. 
 2. Each will Wait the other's semaphore to wait until the other is ready to proceed.
 
 Producer-Consumer Mutual Exclusion using Semaphores:
 Two semaphores: Producer_semaphore & Buffer_semaphore
+
+```
+producer():
+	wait(prod_sem); # acquire lock to send
+	signal(buf_sem); # buffer messages ready to send
+
+consumer():
+	signal(prod_sem) # initialise
+	wait(buf_sem); # wait for messages
+	signal(prod_sem); # messages received
+```
 
 Producer Process:
 1. Wait Producer_semaphore
@@ -844,29 +949,29 @@ Message Queues more suitable for IPC between processes not sharing
 Scheduling:
 
 1. First-In-First-Out Scheduling:
-Queuing
-Treats all processes equally
-Starvation is not possible
-No concept of urgent process priority
-All are assigned a Queue ID to identify, service in order of ID
+	Queuing
+	Treats all processes equally
+	Starvation is not possible
+	No concept of urgent process priority
+	All are assigned a Queue ID to identify, service in order of ID
 
 2. Shortest-Job-First Scheduling:
-Finish all the quickest jobs first
-Has the lowest average waiting time
-Utilitarian (Good for the group over individual)
-Multiple queues : 
-	a. Express queue for very quick processes
-	b. Normal queue for regular processes
+	Finish all the quickest jobs first
+	Has the lowest average waiting time
+	Utilitarian (Good for the group over individual)
+	Multiple queues : 
+	1. Express queue for very quick processes
+	2. Normal queue for regular processes
 
-3. Priority Scheduling:
-Assign Priority to jobs, based on urgency, or need, or their importance wrt other processes
-Priority Queue
+2. Priority Scheduling:
+	Assign Priority to jobs, based on urgency, or need, or their importance wrt other processes
+	Priority Queue
 
 4. Round-Robin Scheduling:
-Preemption - The ability for a process to halt its execution midway and allow other processes to be scheduled.
-Once a process is done, the control passes to the next process (via PID) in a cyclic manner
-Thus the control passes through all of the processes in a preemptive manner
-Relay Scheduling
+	Preemption - The ability for a process to halt its execution midway and allow other processes to be scheduled.
+	Once a process is done, the control passes to the next process (via PID) in a cyclic manner
+	Thus the control passes through all of the processes in a preemptive manner
+	Relay Scheduling
 
 Preemptive Scheduling Methods:
 From the POV of the processor,
@@ -887,6 +992,7 @@ This time should be more than the time taken to schedule process work (cost of p
 2. Adaptive - Based on a fixed value and size of the process queue, decide the time slice
 
 We can measure the time slice wrt preemption cost: 1 Time Slice ≡ N preemption cost
+time slice : Responsive Time/NumberofProcesses
 This provides the lower bound for time slice
 
 Policy vs Mechanism in Scheduling
@@ -954,10 +1060,10 @@ Place restrictions on resource requests so that deadlock cannot occur
 Deadlock Avoidance:
 There are Algorithms for detecting Deadlock
 Disadvantages:
-	1. The algorithms are not fast
-	2. Lot of overheads in running them before resource allocation
-	3. Assumes every process know their max resources needs
-	4. Assumes processes know what available resources are present
+1. The algorithms are not fast
+2. Lot of overheads in running them before resource allocation
+3. Assumes every process know their max resources needs
+4. Assumes processes know what available resources are present
 
 Deadlock Recovery:
 1. Deadlock Detection - same as finding cycle in a graph, done periodically
@@ -1019,6 +1125,7 @@ If a process calls wait on a condition variable, it is made blocked until anothe
 wait also unlocks the monitor
 If a process calls signal, it unblocks all waiting processes
 
+CHAPTER 10
 MEMORY MANAGEMENT
 
 There are 2 levels of memory management:
@@ -1072,6 +1179,11 @@ It finally creates a self sufficient program with no dependencies.
 
 ![[Pasted image 20231110205917.png]]
 
+A Load Module is a self-sufficent set of instructions which encodes your program, and the machine and easily run it
+It is created by the Linker, by linking various object modules
+
+1 Object module created for each program compiled
+
 The load module is divided into 3 sections:
 1. Code
 2. Initialized data
@@ -1091,7 +1203,7 @@ Linker Process -
 			1. Fix all of the undefined missing symbol references in the global symbol table.
 4. If the object module is from an library then:
 	1. Find each undefined symbol in the global symbol table.
-		2. Check if the symbols are defined in the library; If so, load the module.
+	2. Check if the symbols are defined in the library; If so, load the module.
 5. Repeat from Step 3.
 
 Each object module is connected loosely via symbol references (e.g sqrt function will link the Math module).
@@ -1103,6 +1215,8 @@ The local address references are saved in a table by the compiler/assembler whic
 
 Dynamic Relocation :
 The load module itself is located somewhere in the disk, so when it is read into the memory, its address is adjusted to be absolute by adding the <i>base</i> register. Since all of the object module addresses are now wrt load module, the base address is added to all of them same.
+
+To run the load module, the OS will allocate code & initialized data memory as specified in the load module, and a default heap & stack
 
 Each Process memory block has 5 sections:
 1. Executable Code (from the load module)
@@ -1157,6 +1271,7 @@ It is easy to implement
 Works when
 1. the range is small
 2. there are only a few requests with different sizes
+
 Bad when
 1. Range too big
 2. Some requests are too large
@@ -1170,6 +1285,8 @@ Dynamic Memory Allocation-
 
 Fragmentation - When the memory is divided into so many small blocks that all of them become useless to be allocated.
 Can be avoided by regrouping the adjacent free blocks.
+
+<h4>Keeping track of blocks</h4>
 
 Block List -
 Used to keep track of all the blocks in the memory in form of a linked list.
@@ -1190,11 +1307,13 @@ If that block is allocated, corresponding bit is 1 else 0.
 Fixed size contigous allocation
 
 Differences between List Method and Bitmap Method:
-1. List is better for less blocks.
-2. Overhead for the block is same for both.
-3. List need not use fixed size contigous allocation, whereas Bitmap will need to.
-4. List - Fast to find free blocks; 
-5. Bitmap can be distributed over the disk and memory.
+
+| Block List                         | Bit Map                         |
+| ---------------------------------- | ------------------------------- |
+| Better for less block              | Distributed over disk           | 
+| Per block overhead is same         | Per block overhead is same      |
+| No fixed size contigous allocation | Fixed size contigous allocation |
+| Fast to find free blocks           | Slow to find free blocks        |
 
 Memory Management System Calls 
 
@@ -1206,7 +1325,8 @@ The programming language runtime procedures manage the Stack.
 
 If there are free blocks in between the Heap, then the memory manager will not free them for the OS.
 
-A Different System Calls- char\* AllocateMemory(int length)
+A Different System Calls-
+char\* AllocateMemory(int length)
 
 Allocates 'length' amount of bytes and returns their starting address.
 
@@ -1238,7 +1358,7 @@ A Page Table is a collection of PTEs
 Paging is completely transparent to the programmer
 
 How to determine No of pages and their size from Logical Address length:
-1. # Pages = $2^{\text{|Page|}}$ 
+1. \# Pages = $2^{\text{|Page|}}$ 
 2. Size of 1 Page = $2^{(\text{Offset Length})}$ 
 
 More pages, more overhead on process switching (as each time we would have to save register data on pages)
@@ -1454,7 +1574,7 @@ Within each phase, the working set is fairly stable
 Virtual time - No of pages referenced
 One unit of virtual time - one page reference
 
-Reference string - sequence of page references : r1, r2, ... rT
+Reference string - sequence of page references : $r_1, r_2, ... r_T$
 
 We shall look back on certain t references, so the working set is
 $W(T,t) = \{r_{T},r_{T-1},r_{T-2},...,r_{T-t+1}\}$ 
@@ -1475,6 +1595,8 @@ Hard to implement, requires lot of memory support
 
 WSClock Paging Algorithm:
 A page is in the working set if it has been referenced in the working set window, if it is not in the window, we replace it
+
+As the working set changes, so does the process virtual time.
 
 Notations:
 N - page pointed by the current clock pointer
@@ -1582,3 +1704,143 @@ Difference between Ordinary Page Table & Inverted Page Table:
 
 We use a hash table to complement the Inverted page table
 
+------------------------------------------------------------------------
+
+<h1>File System</h1>
+File referred by inode index
+Directory is special kind of files
+Directory contains (file_name,inode_index)
+
+1. Create Files:
+	filedescriptor = open(file_name,flag)
+2. Read/Write Files:
+	read()
+	write()
+3. Seek to position:
+	lseek(fd,offset,flag)
+4. Duplicate File Descriptor:
+	dup2() - used to duplicate a fd
+	Can be used for file I/O redirection
+5. File Sync:
+	fsync() - force write to the disk (if file newly created, fsync the directory too)
+6. Linking :
+	Hard Link - two file names with same inode number
+	Copying will create a new inode number
+
+Set of Reads/Writes:
+read/write /foo/bar
+
+open(/foo/bar)
+1. R - Root Inode - read foo location pointer
+2. R - Root data blocks - read foo location
+3. R - Foo Inode - read bar location
+4. R - Bar Inode - read into memory
+
+read(/foo/bar)
+1. R - Bar Inode - Look for the data block
+2. R - Bar Data block - Look up the lseek value
+3. W - Bar Inode - update lseek value
+
+create(/foo/bar)
+1. R - Root Inode - read foo location pointer
+2. R - Root data blocks - read foo location
+3. R - Foo Inode - search for the bar pointer
+4. R - Foo Data - get a free file pointer
+5. R - Inode Bitmap - find free inode block
+6. W - Inode Bitmap - Write allocated
+7. W - Foo Data - Write the inode entry of bar
+8. R - Bar Inode - Enter into the inode entry
+9. W - Bar Inode - Write the inode location
+10. W - Foo Inode - add the pointer to bar
+
+write(/foo/bar)
+1. R - Bar Inode - Search for data pointers
+2. R - Data Bitmap - Search for free blocks
+3. W - Data Bitmap - Write allocated
+4. W - Bar Data - Write into the data blocks
+5. W - Bar Inode - Update the entry in inode
+
+Turnaround Time:
+Difference between completion and arrival
+Completion
+$T_{\text{turnaround}} = T_{\text{completion}} - T_{\text{arrival}}$
+
+Response Time:
+Difference between first scheduled and arrival
+Responsiveness
+$T_{\text{response}} = T_{\text{firstrun}} - T_{\text{arrival}}$
+
+Multi-Level Feedback Queue
+1. Optimize Turnaround Time
+2. Minimise Response Time
+
+Number of distince queues (each with different prioirities)
+Job is run on 1 queue
+Job on higher prioirity queue (thus has higher prioirity) runs first 
+Varies priority based on observed behaviour
+
+Rules:
+1. Priority(A) > Priority(B) -> A runs, B doesn't
+2. Priority(A) = Priority(B) -> A & B run in Round Robin
+3. When Job enters the system first time, placed in highest priority queue
+4. Once a job uses its time allotment at a give queue, its priority is reduced (irrespective of time slice)
+5. After time slice $S$, move all jobs to topmost queue (avoid starvation)
+
+Allocation of heap memory:
+Free List - Linked list of all free blocks (addr,length)
+1. Best Fit - Finds the block best approx of requested
+	1. $O(n)$ searching
+2. First Fit - Finds the first block $\geq$ required size
+	1. pollutes the beginning of free list with small size blocks
+3. Worst Fit - Finds the largest block and returns the requested block
+	1. $O(n)$ searching
+4. Next Fit - Finds the block after the last allocation
+	1. Spread more uniformly
+
+Average Memory Access Time (AMAT):
+$AMAT = T_{M} + (P_{\text{Miss}}.T_{D})$
+where
+$T_{M}$ is cost of accessing memory
+$T_{D}$ is cost of accessing disk
+$P_{miss}$ is probability of not finding the data in the cache (a miss)
+
+```
+write(fd,&str,sizeof(str));
+open(file_name,O_CREAT | O_RDWR | O_RDONLY);
+lseek(fd,offset,SEEK_CUR | SEEK_BEG | SEEK_END);
+dup2(fd1,fd2); # redirect file writes to fd2 (duplicates the fd1)
+close(fd);
+
+fork();
+execve(process,newargv,newenviron);
+getppid();
+getpid();
+
+qid = mq_open(msg_q,O_RDONLY | O_RD_WR); # POSIX MSQ
+mq_receive(qid,buffer,msg_msize,mprio); # POSIX MSG
+mq_close(qid); # POSIX MSG
+mq_send(qid,mtext,sizeof(mtext),mprio); # POSIX MSG
+
+qid = msgget(msgkey,IPC_CREAT); # IPC
+msgrcv(qid,&msg,msg_size,msgtype,MSG_NOERROR | IPC_NOWAIT);
+msgsnd(qid,&msg,msg_size,IPC_NOWAIT);
+
+pipe(int pipefd[2]) # create a pipe
+# pipefd[0] - read & pipefd[1] - write (array of file descriptors)
+read(pipefd[0],&buf,size(buf));
+write(pipefd[1],&buf,size(buf));
+close(pipefd[0]);
+
+shm_open(char *name,int oflag,mode_t mode);
+ftruncate(int fd,off_t length); # set size of shared memory object
+mmap(void *addr,size_t length) # map a shm obj into a process address space
+shm_unlink(char *name); # remove shm obj
+
+sem_init(sem_t *sem,int pshared,int val); # initialise unnamed semaphore
+sem_wait(sem_t *sem) # decrement/lock a semaphore
+sem_post(sem_t *sem); # increment/unlock a semaphore
+```
+
+execve(process,argv,environ)-
+1. argv is pointer to array of pointers to null terminated strings (arguments passed to new program, argv[0] should be name of the process itself)
+2. environ is pointer to array of pointers to null terminated strings representing environment variables (last element must be NULL)
